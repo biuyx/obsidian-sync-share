@@ -83,7 +83,7 @@ This command allows you to specify additional parameters for configuring the ser
 
 limit memory
 
-`-e JAVA_OPTS=-Xmx512m  ` 
+`-e JAVA_OPTS=-Xmx256m  ` 
 
 Modify the default branch name of git, which is master by default, The following example sets the default branch name to main
 
