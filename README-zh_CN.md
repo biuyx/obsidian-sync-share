@@ -84,7 +84,7 @@ alterzz/obsidian-sync-share-server
 
 限制内存
 
-`-e JAVA_OPTS=-Xmx512m` 
+`-e JAVA_OPTS=-Xmx256m` 
 
 修改git默认分支名称，默认为master, 以下示例将默认分支名称设置为 main
 
