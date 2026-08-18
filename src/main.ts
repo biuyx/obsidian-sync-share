@@ -3,7 +3,7 @@ import * as localforage from "localforage";
 import { enqueueTask } from 'src/TaskQueue';
 import { request, setRequestConcurrentNum } from 'src/request';
 import SettingTab, { isValidPassword, isValidServerUrl, isValidUsername } from 'src/setting';
-import { ShareHistoryStore, ShareModal, shareNotes } from 'src/share';
+import { ShareHistoryStore, ShareFolderModal, ShareModal, shareNotes } from 'src/share';
 import { HistoryModal } from './history';
 export type LocalForage = typeof localforage;
 // Remember to rename these classes and interfaces!
@@ -758,6 +758,15 @@ export default class NoteSyncSharePlugin extends Plugin {
 							new HistoryModal(this.app, this, file).open();
 						}))
 
+					menu.addSeparator();
+				} else if (file instanceof TFolder) {
+					menu.addSeparator();
+					menu.addItem(item => item
+						.setTitle("Share folder to web")
+						.setIcon('up-chevron-glyph')
+						.onClick(async () => {
+							new ShareFolderModal(this.app, this, file).open();
+						}))
 					menu.addSeparator();
 				}
 

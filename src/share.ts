@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Platform, Plugin, Setting, TFile, getIcon } from "obsidian";
+import { App, Modal, Notice, Platform, Plugin, Setting, TFile, TFolder, getIcon } from "obsidian";
 import { request } from "src/request";
 import * as path from 'path-browserify'
 import NoteSyncSharePlugin from "./main";
@@ -50,6 +50,29 @@ export const shareNotes = async (plugin: NoteSyncSharePlugin, file: TFile, expir
 
     }
 
+}
+
+export const shareFolder = async (plugin: NoteSyncSharePlugin, folder: TFolder, expirationDate: number, headerPosition: string) => {
+    const { username, token } = plugin.settings;
+    const serverUrl = plugin.getServerUrl();
+
+    const formData = new FormData();
+    formData.append('path', folder.path);
+    formData.append('expirationDate', expirationDate + "");
+    formData.append('headerPosition', headerPosition);
+
+    return await request(`${serverUrl}/share/shareFolder`, {
+        method: 'POST',
+        headers: {
+            'username': username,
+            'token': token
+        },
+        body: formData
+    }).then(res => res.text()).then(url => {
+        navigator.clipboard.writeText(plugin.settings.serverUrl + url);
+        new Notice("Folder Shared to Web. URL copied to clipboard.");
+        return plugin.settings.serverUrl + url;
+    })
 }
 
 const findAttachmentByLink = (file: TFile, link: string) => {
@@ -342,6 +365,97 @@ export class ShareModal extends Modal {
         }
 
         loadHistory();
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+export class ShareFolderModal extends Modal {
+    plugin: NoteSyncSharePlugin;
+    folder: TFolder;
+    expirationType: "Unset" | "Minutes" | "Hours" | "Days"
+    expirationValue: number
+    headerPosition: 'static' | 'sticky' = 'static'
+
+    constructor(app: App, plugin: NoteSyncSharePlugin, folder: TFolder) {
+        super(app);
+        this.plugin = plugin;
+        this.folder = folder;
+        this.expirationType = "Unset";
+        this.expirationValue = 0;
+    }
+
+    async onOpen() {
+        const { contentEl } = this;
+
+        const title = contentEl.createDiv({ text: 'Share folder: ' + this.folder.path });
+        title.addClass("modal_title_warpper")
+
+        new Setting(contentEl)
+            .setName('Expiration date')
+            .setDesc('Set an expiration date, after which the notes will be blocked from access')
+            .addDropdown(dropdown =>
+                dropdown.addOption("Unset", "Unset")
+                    .addOption("Minutes", "Minutes")
+                    .addOption("Hours", "Hours")
+                    .addOption("Days", "Days")
+                    .setValue(this.expirationType)
+                    .onChange(async val => {
+                        this.expirationType = val as any;
+                    })
+            )
+            .addText(text => text
+                .setPlaceholder('Please enter a number')
+                .setValue(this.expirationValue + "")
+                .onChange(async (value) => {
+                    var regex = /^[1-9][0-9]*$/;
+                    let num = value;
+                    if (!regex.test(num)) {
+                        num = num.replace(/[^1-9]/g, '');
+                        text.setValue(num);
+                    }
+                    if (parseInt(num) > 10000) {
+                        num = "10000";
+                        text.setValue(num);
+                    }
+                    this.expirationValue = parseInt(num);
+                }))
+
+        new Setting(contentEl)
+            .setName('Header position')
+            .setDesc('Setting a fixed pattern for the header of the sharing page')
+            .addDropdown(dropdown =>
+                dropdown.addOption("static", "Default")
+                    .addOption("sticky", "Sticky")
+                    .setValue(this.headerPosition)
+                    .onChange(async val => {
+                        this.headerPosition = val as any;
+                    })
+            )
+
+        new Setting(contentEl)
+            .addButton(button => {
+                button.buttonEl.style.width = "100%"
+                button.setButtonText("Share Folder & Copy")
+                    .onClick(async e => {
+                        let expirationDate = 0;
+                        if (this.expirationType === "Minutes" && this.expirationValue > 0) {
+                            expirationDate = Date.now() + (1000 * 60 * this.expirationValue)
+                        } else if (this.expirationType === "Hours" && this.expirationValue > 0) {
+                            expirationDate = Date.now() + (1000 * 60 * 60 * this.expirationValue)
+                        } else if (this.expirationType === "Days" && this.expirationValue > 0) {
+                            expirationDate = Date.now() + (1000 * 60 * 60 * 24 * this.expirationValue);
+                        }
+                        const url = await shareFolder(this.plugin, this.folder, expirationDate, this.headerPosition);
+                        if (url) {
+                            await this.plugin.shareHistoryStore.addShareHistory(this.folder.path, url);
+                        }
+                        this.close();
+                    })
+            })
     }
 
     onClose() {
